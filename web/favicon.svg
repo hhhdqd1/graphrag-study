@@ -1,0 +1,2 @@
+<!-- 【页面资源】浏览器标签图标；纯 SVG 矢量图，不运行 GraphRAG。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" rx="12" fill="#18191b"/><path d="m13 12 22 12-22 12" fill="none" stroke="#ff4a1f" stroke-width="3"/><g fill="#ff4a1f"><circle cx="13" cy="12" r="5"/><circle cx="35" cy="24" r="5"/><circle cx="13" cy="36" r="5"/></g></svg>
