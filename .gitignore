@@ -1,0 +1,16 @@
+# 【Git 忽略规则】本机环境、资料副本、索引和运行产物不作为源码提交。
+.env
+.env.*
+!.env.example
+.venv/
+cache/
+logs/
+output/
+source_documents/
+__pycache__/
+.idea/
+.DS_Store
+.taste-skill/
+# 导入资料只保留目录说明，不上传用户的 PDF/TXT 内容。
+input/*
+!input/README.md

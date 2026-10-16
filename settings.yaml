@@ -1,0 +1,179 @@
+# 【08 · GraphRAG 配置】由 serve.py / web_worker.py / GraphRAG 索引命令读取。
+# 这是复制原项目后的独立配置，以下注释不改变任何配置值或模型行为。
+# 重点先看：models（模型）→ input（文档）→ chunks（切块）→ output（索引）→ local/global_search。
+# 密钥从 .env 的 GRAPHRAG_API_KEY 读取，不要在本文件直接写真实 API 密钥。
+### This config file contains required core defaults that must be set, along with a handful of common optional settings.
+### For a full list of available settings, see https://microsoft.github.io/graphrag/config/yaml/
+
+### LLM settings ###
+## There are a number of settings to tune the threading and token limits for LLM calls - check the docs.
+
+# 本地 Ollama 的聊天模型与向量模型；两者用途不同，问答和建索引都可能用到。
+models:
+  default_chat_model:
+    type: openai_chat # or azure_openai_chat
+    api_base: http://localhost:11434/v1
+    # api_version: 2024-05-01-preview
+    auth_type: api_key # or azure_managed_identity
+    api_key: ${GRAPHRAG_API_KEY} # set this in the generated .env file
+    # audience: "https://cognitiveservices.azure.com/.default"
+    # organization: <organization_id>
+    model: qwen2.5:7b
+    # deployment_name: <azure_model_deployment_name>
+    encoding_model: cl100k_base # token counting fallback for the Ollama model name
+    model_supports_json: true # Qwen2.5 follows Ollama's JSON response mode.
+    concurrent_requests: 1 # keep local inference memory usage predictable
+    async_mode: threaded # or asyncio
+    retry_strategy: native
+    max_retries: -1                   # set to -1 for dynamic retry logic (most optimal setting based on server response)
+    tokens_per_minute: 0              # set to 0 to disable rate limiting
+    requests_per_minute: 0            # set to 0 to disable rate limiting
+  default_embedding_model:
+    type: openai_embedding # or azure_openai_embedding
+    api_base: http://localhost:11434/v1
+    # api_version: 2024-05-01-preview
+    auth_type: api_key # or azure_managed_identity
+    api_key: ${GRAPHRAG_API_KEY}
+    # audience: "https://cognitiveservices.azure.com/.default"
+    # organization: <organization_id>
+    model: bge-m3
+    # deployment_name: <azure_model_deployment_name>
+    encoding_model: cl100k_base # token counting fallback for the Ollama model name
+    model_supports_json: true # recommended if this is available for your model.
+    concurrent_requests: 1 # local embedding runner
+    async_mode: threaded # or asyncio
+    retry_strategy: native
+    max_retries: -1                   # set to -1 for dynamic retry logic (most optimal setting based on server response)
+    tokens_per_minute: 0              # set to 0 to disable rate limiting
+    requests_per_minute: 0            # set to 0 to disable rate limiting
+
+# LanceDB 保存向量，路径相对“当前项目”，不是原项目的位置。
+vector_store:
+  default_vector_store:
+    type: lancedb
+    db_uri: output/lancedb
+    container_name: default
+    overwrite: True
+
+# 文本向量化使用上面的 embedding 模型，并保存到默认向量库。
+embed_text:
+  model_id: default_embedding_model
+  vector_store_id: default_vector_store
+
+### Input settings ###
+
+# GraphRAG 只读 input/ 的 .txt；PDF 模块会先把逐页文字转成 .pdf.txt。
+input:
+  type: file # or blob
+  file_type: text # or csv
+  base_dir: "input"
+  file_encoding: utf-8
+  file_pattern: ".*\\.txt$$"
+
+# 把长文切成文本块；size 为目标 token 数，overlap 为相邻块重叠量。
+chunks:
+  size: 1200
+  overlap: 100
+  group_by_columns: [id]
+
+### Output settings ###
+## If blob storage is specified in the following four sections,
+## connection_string and container_name must be provided
+
+# 缓存模型调用结果，便于重复实验；不等于最终索引。
+cache:
+  type: file # [file, blob, cosmosdb]
+  base_dir: "cache"
+
+# 运行日志用于排查建索引失败；初学时不必修改。
+reporting:
+  type: file # [file, blob, cosmosdb]
+  base_dir: "logs"
+
+# 最终实体、关系、文本块和社区报告写入这里。
+output:
+  type: file # [file, blob, cosmosdb]
+  base_dir: "output"
+
+### Workflow settings ###
+
+# 从文本块抽取实体和关系；提示词模板在 prompts/extract_graph.txt。
+extract_graph:
+  model_id: default_chat_model
+  prompt: "prompts/extract_graph.txt"
+  entity_types: [organization,person,geo,event]
+  max_gleanings: 1
+
+# 合并同一实体/关系的多条描述，不是重新生成原文。
+summarize_descriptions:
+  model_id: default_chat_model
+  prompt: "prompts/summarize_descriptions.txt"
+  max_length: 500
+
+# 可选的 NLP 抽取参数，当前学习流程保留原配置。
+extract_graph_nlp:
+  text_analyzer:
+    extractor_type: regex_english # [regex_english, syntactic_parser, cfg]
+
+# 可选的事实/主张抽取，enabled 为 false 时不会运行该阶段。
+extract_claims:
+  enabled: false
+  model_id: default_chat_model
+  prompt: "prompts/extract_claims.txt"
+  description: "Any claims or facts that could be relevant to information discovery."
+  max_gleanings: 1
+
+# 根据社区中的实体与关系生成报告，供 Global Search 汇总。
+community_reports:
+  model_id: default_chat_model
+  graph_prompt: "prompts/community_report_graph.txt"
+  text_prompt: "prompts/community_report_text.txt"
+  max_length: 2000
+  max_input_length: 8000
+
+# 将实体关系网络分组为社区。
+cluster_graph:
+  max_cluster_size: 10
+
+# 可选的图结构向量，不是前面文本 embedding 的同义词。
+embed_graph:
+  enabled: false # if true, will generate node2vec embeddings for nodes
+
+# 可选降维设置，服务于图布局/分析，不是网页问答入口。
+umap:
+  enabled: false # if true, will generate UMAP embeddings for nodes (embed_graph must also be enabled)
+
+# 控制额外中间产物是否保存，用于调试和分析。
+snapshots:
+  graphml: false
+  embeddings: false
+
+### Query settings ###
+## The prompt locations are required here, but each search method has a number of optional knobs that can be tuned.
+## See the config docs: https://microsoft.github.io/graphrag/config/yaml/#query
+
+# Local：围绕具体实体，结合关系、原文和社区信息回答。
+local_search:
+  chat_model_id: default_chat_model
+  embedding_model_id: default_embedding_model
+  prompt: "prompts/local_search_system_prompt.txt"
+
+# Global：先阅读多个社区报告，再归纳整体主题。
+global_search:
+  chat_model_id: default_chat_model
+  map_prompt: "prompts/global_search_map_system_prompt.txt"
+  reduce_prompt: "prompts/global_search_reduce_system_prompt.txt"
+  knowledge_prompt: "prompts/global_search_knowledge_system_prompt.txt"
+
+# 预留的 DRIFT 检索参数；当前网页只开放 Local 和 Global。
+drift_search:
+  chat_model_id: default_chat_model
+  embedding_model_id: default_embedding_model
+  prompt: "prompts/drift_search_system_prompt.txt"
+  reduce_prompt: "prompts/drift_search_reduce_prompt.txt"
+
+# 预留的基础检索参数；当前网页没有单独开放 Basic 按钮。
+basic_search:
+  chat_model_id: default_chat_model
+  embedding_model_id: default_embedding_model
+  prompt: "prompts/basic_search_system_prompt.txt"

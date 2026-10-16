@@ -1,0 +1,10 @@
+# 【依赖清单】本项目的核心库与已验证版本；由环境安装工具读取，不是启动脚本。
+# 完整复现请使用 requirements-lock.txt；不要在学习过程中随意升级 GraphRAG。
+# GraphRAG：索引与检索；click/typer/weasel：命令入口及兼容性；spacy：文本处理。
+graphrag==2.0.0
+click==8.1.8
+spacy==3.8.4
+typer==0.15.1
+weasel==0.4.1
+# PDF 文字提取；不包含 OCR，也不负责读取图片语义。
+pypdf==6.10.0
