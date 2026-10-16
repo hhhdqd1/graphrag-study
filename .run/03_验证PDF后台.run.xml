@@ -1,0 +1,15 @@
+<!-- 后台回归：测试只使用临时目录，不向学习知识库写测试文档。 -->
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="03 验证 PDF 后台" type="PythonConfigurationType" factoryName="Python">
+    <module name="graphrag-study" />
+    <option name="SDK_HOME" value="$PROJECT_DIR$/.venv/bin/python" />
+    <option name="IS_MODULE_SDK" value="false" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+    <option name="SCRIPT_NAME" value="unittest" />
+    <option name="PARAMETERS" value="discover -s tests -p test_*.py -v" />
+    <option name="MODULE_MODE" value="true" />
+    <option name="PARENT_ENVS" value="true" />
+    <envs><env name="PYTHONUNBUFFERED" value="1" /></envs>
+    <method v="2" />
+  </configuration>
+</component>
